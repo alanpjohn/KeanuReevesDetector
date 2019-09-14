@@ -2,7 +2,7 @@
 """
 Created on Mon Sep  2 15:44:50 2019
 
-@author: Vinay Valson
+@author: Alan John
 """
 
 from flask import Flask,render_template,url_for,request,redirect,flash
@@ -14,14 +14,26 @@ import matplotlib.pyplot as plt
 import os
 import tensorflow as tf
 from tensorflow.keras.models import model_from_json
+import boto3
+from botocore.client import Config
+import urllib
 
-# import pandas as pd
-# import numpy as np 
+ACCESS_KEY_ID = ''
+ACCESS_SECRET_KEY = ''
+BUCKET_NAME = 'keanu-reeves'
 
-# #ML packages
-# from sklearn.feature_extraction.text import CountVectorizer
-# from sklearn.extenals import joblib
+s3 = boto3.resource(
+    's3',
+    aws_access_key_id=ACCESS_KEY_ID,
+    aws_secret_access_key=ACCESS_SECRET_KEY,
+    config=Config(signature_version='s3v4')
+)
 
+def get_image(i):
+    req = urllib.request.urlopen(i)
+    arr = np.asarray(bytearray(req.read()), dtype=np.uint8)
+    img = cv2.imdecode(arr, 0) # 'Load it as it is'
+    return img
 
 app = Flask(__name__)
 Bootstrap(app)
@@ -31,7 +43,7 @@ def query():
 	print(request.query_string)
 	return "no query received",200
 
-app.config["IMAGE_UPLOADS"] = 'C:/Users/Vinay Valson/Desktop/syndicate/static/img/uploads'
+app.config["UPLOAD_FOLDER"] = 'https://keanu-reeves.s3.ap-south-1.amazonaws.com/'
 app.config["ALLOWED_IMAGE_EXTENSIONS"] = ["PNG","JPG","JPEG","GIF"]
 
 def allowed_image(filename):
@@ -44,7 +56,7 @@ def allowed_image(filename):
 		return True
 	else:
 		return False
-   
+
 # def predict(i):
 # #     img = cv2.imread(i,0)
 # #     plt.imshow(img, cmap='gray')
@@ -68,29 +80,29 @@ def allowed_image(filename):
 # 		return(0)
 @app.route('/',methods=["GET" , "POST"])
 def index():
-	if request.method=="POST":
-		if request.files:
-			image = request.files["image"]
-			if image.filename == "":
-				print("image must have a filename")
-				return redirect(request.url)
-			if not allowed_image(image.filename):
-				print("That image extension is not allowed")
-				return redirect(request.url)
-
-			print(image.filename)
-			image.save(os.path.join(app.config["IMAGE_UPLOADS"], image.filename))
-			print("image saved")
+	if request.method == 'POST':
+		if 'image' not in request.files :
+			flash('No file part')
+			return redirect(request.url)
+		file = request.files['image']
+		if file.filename == '':
+			flash('No selected file')
+			return redirect(request.url)
+		if file and allowed_image(file.filename):
+			filename = file.filename
+			#file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+			s3.Bucket(BUCKET_NAME).put_object(Key=filename, Body=file , ACL='public-read')
+			print(file.filename)
 			#loading model
 			json = open('models/model2.json','r')
 			model = json.read()
 			model = model_from_json(model)
 			model.load_weights('models/model2.h5')
-			i = os.path.join(app.config["IMAGE_UPLOADS"], image.filename)
+			i = os.path.join(app.config["UPLOAD_FOLDER"], file.filename)
 			# img = cv2.imread(i,0)
 			# plt.imshow(img, cmap='gray')
 			# plt.show()
-			img = cv2.imread(i,0)
+			img = get_image(i)
 			img = cv2.resize(img,(200,200))
 			img = tf.keras.utils.normalize(img)
 			img = img.reshape(1,200,200,1)
@@ -98,11 +110,11 @@ def index():
 				flash("ITS BREATHTAKING")
 			else:
 				flash("NOT SO BREATHTAKING")
-	
+
 			return redirect(request.url)
 	return render_template('index.html')
 
 
 if __name__ == '__main__':
 	app.secret_key='12345'
-	app.run(debug = True)
+	app.run(debug = "true")
