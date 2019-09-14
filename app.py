@@ -57,27 +57,6 @@ def allowed_image(filename):
 	else:
 		return False
 
-# def predict(i):
-# #     img = cv2.imread(i,0)
-# #     plt.imshow(img, cmap='gray')
-# #     plt.show()
-
-# 	#loading model
-# 	json = open('models/model2.json','r')
-# 	model = json.read()
-# 	model = model_from_json(model)
-# 	model.load_weights('models/model2.h5')
-# 	# img = cv2.imread(i,0)
-# 	# plt.imshow(img, cmap='gray')
-# 	# plt.show()
-# 	img = cv2.imread(i,0)
-# 	img = cv2.resize(img,(200,200))
-# 	img = tf.keras.utils.normalize(img)
-# 	img = img.reshape(1,200,200,1)
-# 	if model.predict_classes(img):
-# 		return(1)
-# 	else:
-# 		return(0)
 @app.route('/',methods=["GET" , "POST"])
 def index():
 	if request.method == 'POST':
@@ -90,7 +69,6 @@ def index():
 			return redirect(request.url)
 		if file and allowed_image(file.filename):
 			filename = file.filename
-			#file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
 			s3.Bucket(BUCKET_NAME).put_object(Key=filename, Body=file , ACL='public-read')
 			print(file.filename)
 			#loading model
@@ -99,9 +77,6 @@ def index():
 			model = model_from_json(model)
 			model.load_weights('models/model2.h5')
 			i = os.path.join(app.config["UPLOAD_FOLDER"], file.filename)
-			# img = cv2.imread(i,0)
-			# plt.imshow(img, cmap='gray')
-			# plt.show()
 			img = get_image(i)
 			img = cv2.resize(img,(200,200))
 			img = tf.keras.utils.normalize(img)
